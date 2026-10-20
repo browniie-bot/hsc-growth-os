@@ -199,6 +199,8 @@ export async function register() {
       }
       const drafted = await prospecting.draftDueSequenceFollowups(db);
       if (drafted) console.log(`[outreach] drafted ${drafted} follow-up(s)`);
+      const queued = await prospecting.autoSendPendingSequence(db);
+      if (queued) console.log(`[outreach] auto-send queued ${queued} email(s)`);
     } catch (err) {
       console.error("[outreach] tick failed:", err);
     }

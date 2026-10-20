@@ -29,7 +29,17 @@ import {
 
 export const SEGMENT_SEARCH: Record<
   Segment,
-  { titles: string[]; keywordTags: string[]; employeeRanges: string[]; accountType: string; weight: number }
+  {
+    titles: string[];
+    keywordTags: string[];
+    employeeRanges: string[];
+    accountType: string;
+    weight: number;
+    orgInTexas?: boolean;
+    /** One person per company (default). Franchisees share a brand, so they
+     *  dedupe per person instead. */
+    perPerson?: boolean;
+  }
 > = {
   // GCs keep bid lists — the strongest group, so the biggest share of each batch.
   gc: {
@@ -60,9 +70,26 @@ export const SEGMENT_SEARCH: Record<
     accountType: "architect",
     weight: 0.15,
   },
+  // Franchisees and multi-unit operators in Texas (Rameel 2026-10-19: "add in
+  // the franchises now"). Built OFF behind OUTREACH_FRANCHISE_ENABLED until
+  // Rameel approves the franchise template copy (he approves every template).
+  franchise: {
+    titles: ["franchise owner", "franchisee", "multi-unit owner", "multi-unit franchisee", "area developer", "owner operator"],
+    keywordTags: ["franchise", "franchising", "restaurants", "fitness", "retail"],
+    employeeRanges: [],
+    accountType: "franchise_operator",
+    weight: 0.2,
+    orgInTexas: false,
+    perPerson: true,
+  },
 };
 
-const SEGMENTS = Object.keys(SEGMENT_SEARCH) as Segment[];
+/** Groups in today's batch. Franchise joins only once its template is approved. */
+export function activeSegments(): Segment[] {
+  return (Object.keys(SEGMENT_SEARCH) as Segment[]).filter(
+    (s) => s !== "franchise" || process.env.OUTREACH_FRANCHISE_ENABLED === "true"
+  );
+}
 
 const HOUSTON = [
   "houston", "katy", "sugar land", "the woodlands", "spring", "cypress", "pearland", "humble", "kingwood",
@@ -94,9 +121,11 @@ export function marketForCity(city?: string | null): Market {
 /** Split the day's count across groups by weight; rounding leftovers go to GCs. */
 export function segmentQuotas(total: number): Record<Segment, number> {
   const q = {} as Record<Segment, number>;
+  const segments = activeSegments();
+  const weightSum = segments.reduce((a, s) => a + SEGMENT_SEARCH[s].weight, 0);
   let used = 0;
-  for (const s of SEGMENTS) {
-    q[s] = Math.floor(total * SEGMENT_SEARCH[s].weight);
+  for (const s of segments) {
+    q[s] = Math.floor((total * SEGMENT_SEARCH[s].weight) / weightSum);
     used += q[s];
   }
   q.gc += total - used;
@@ -182,7 +211,7 @@ export async function buildDailyOutreachBatch(db: Db, opts: { total?: number; on
     orderBy: desc(events.occurredAt),
   });
   const cursors: Record<string, number> = {
-    ...Object.fromEntries(SEGMENTS.map((s) => [s, 1])),
+    ...Object.fromEntries(activeSegments().map((s) => [s, 1])),
     ...(((last?.payload ?? {}) as { cursors?: Record<string, number> }).cursors ?? {}),
   };
 
@@ -202,7 +231,7 @@ export async function buildDailyOutreachBatch(db: Db, opts: { total?: number; on
   const created: Record<string, number> = {};
   let reveals = 0;
   let quotaHit = false;
-  for (const segment of opts.only ?? SEGMENTS) {
+  for (const segment of opts.only ?? activeSegments()) {
     created[segment] = 0;
     let segmentReveals = 0;
     const want = quotas[segment];
@@ -224,7 +253,8 @@ export async function buildDailyOutreachBatch(db: Db, opts: { total?: number; on
       for (const hit of hits) {
         if (created[segment] >= want) break;
         if (!hit.hasEmail || !hit.orgName || SKIP_ORG.test(hit.orgName)) continue;
-        if (enrolledPeople.has(hit.id) || enrolledOrgSlugs.has(slugify(hit.orgName))) continue;
+        if (enrolledPeople.has(hit.id)) continue;
+        if (!cfg.perPerson && enrolledOrgSlugs.has(slugify(hit.orgName))) continue;
         if (segmentReveals >= want * 3 + 4) break; // credit guard per group per day
         let person;
         try {
@@ -286,7 +316,7 @@ export async function buildDailyOutreachBatch(db: Db, opts: { total?: number; on
         const existing = await db.query.outreachEnrollments.findFirst({
           where: eq(outreachEnrollments.accountId, account.id),
         });
-        if (existing) continue;
+        if (existing && !cfg.perPerson) continue;
         const [contact] = await db
           .insert(contacts)
           .values({
@@ -334,7 +364,15 @@ export async function draftDueSequenceFollowups(db: Db): Promise<number> {
   for (const e of active) {
     if (!e.firstSentAt) continue;
     const next = (e.lastStepSent + 1) as 2 | 3;
-    const due = addBusinessDays(e.firstSentAt, FOLLOWUP_OFFSETS_BUSINESS_DAYS[next]);
+    // Due on the schedule from email 1, but never sooner than 2 business days
+    // after the previous touch (a backlog approved at once must not send
+    // touches 2 and 3 back to back — 2026-10-19).
+    const due = new Date(
+      Math.max(
+        addBusinessDays(e.firstSentAt, FOLLOWUP_OFFSETS_BUSINESS_DAYS[next]).getTime(),
+        addBusinessDays(e.lastSentAt ?? e.firstSentAt, 2).getTime()
+      )
+    );
     if (due.getTime() > Date.now()) continue;
     const exists = await db
       .select({ id: approvals.id })
@@ -351,6 +389,54 @@ export async function draftDueSequenceFollowups(db: Db): Promise<number> {
     if (await draftTouch(db, e, next)) drafted++;
   }
   return drafted;
+}
+
+/**
+ * Auto-send (Rameel 2026-10-19: "we can send the automated emails"). When
+ * OUTREACH_AUTO_SEND=true, every pending sequence email is approved as written
+ * and queued into the normal 9am–5:30pm, ~5-minute-apart send window. The daily
+ * cap, reply/bounce stops, and the guarded send layer still apply. Drafts for
+ * people whose sequence already stopped are withdrawn instead.
+ */
+export async function autoSendPendingSequence(db: Db): Promise<number> {
+  if (process.env.OUTREACH_AUTO_SEND !== "true") return 0;
+  const { queueEmail } = await import("./send-queue");
+  const pending = await db.query.approvals.findMany({
+    where: and(eq(approvals.approvalType, "sequence_email"), eq(approvals.status, "pending")),
+    orderBy: approvals.requestedAt,
+    limit: 200,
+  });
+  let queued = 0;
+  for (const a of pending) {
+    const p = (a.payload ?? {}) as {
+      enrollmentId?: string;
+      step?: number;
+      accountId?: string;
+      contactId?: string;
+      draft?: { subject?: string; body?: string; suggested_email?: string };
+    };
+    const enrollment = p.enrollmentId
+      ? await db.query.outreachEnrollments.findFirst({ where: eq(outreachEnrollments.id, p.enrollmentId) })
+      : null;
+    const ok = enrollment && enrollment.status === "active" && p.draft?.subject && p.draft.body && p.draft.suggested_email;
+    await db
+      .update(approvals)
+      .set({ status: ok ? "approved" : "superseded", resolvedAt: new Date(), resolvedBy: "auto-send" })
+      .where(and(eq(approvals.id, a.id), eq(approvals.status, "pending")));
+    if (!ok) continue;
+    await queueEmail(db, a.id, {
+      channel: "email",
+      to: p.draft!.suggested_email!,
+      subject: p.draft!.subject!,
+      body: p.draft!.body!,
+      accountId: p.accountId,
+      contactId: p.contactId,
+      enrollmentId: p.enrollmentId,
+      step: p.step,
+    });
+    queued++;
+  }
+  return queued;
 }
 
 /** Called by the guarded send layer after a sequence email actually leaves. */
@@ -433,6 +519,29 @@ export async function handleOutreachInbound(
       action: "outreach.bounced",
       detail: `${hit.email} bounced — sequence stopped`,
       actor: "integration",
+    });
+    return true;
+  }
+
+  // Auto-replies (2026-10-19: the first "reply" was an out-of-office saying the
+  // person had left). An out-of-office keeps the sequence going; a "no longer
+  // with us" notice stops that one address; neither stops the whole company.
+  const AUTO_REPLY = /automatic reply|auto[- ]?reply|autoreply|out of (the )?office|ooo\b|away from (the )?office|on vacation/i;
+  if (AUTO_REPLY.test(msg.subject) || /^auto-submitted/im.test(msg.text)) {
+    const own = await db.query.outreachEnrollments.findFirst({ where: eq(outreachEnrollments.email, fromEmail) });
+    if (!own) return false;
+    const left = /no longer (with|employed|at|works)|has left|left the company|no longer being monitored|not monitored/i.test(msg.text);
+    if (left && (own.status === "active" || own.status === "completed")) {
+      await stopEnrollment(db, own.id, "bounced", `Left the company (auto-reply): ${msg.text.slice(0, 160)}`);
+    }
+    await db.insert(interactions).values({
+      accountId: own.accountId,
+      contactId: own.contactId,
+      type: "email",
+      direction: "inbound",
+      subject: msg.subject,
+      summary: msg.text.slice(0, 1000),
+      source: left ? "outreach_auto_reply_left" : "outreach_auto_reply",
     });
     return true;
   }

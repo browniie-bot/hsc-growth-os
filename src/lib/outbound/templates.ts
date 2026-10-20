@@ -7,7 +7,7 @@
 // {{company}}, and {{local_line}}. Never let an LLM rewrite them, and never
 // change copy here without his written approval.
 
-export type Segment = "gc" | "property_manager" | "developer" | "architect";
+export type Segment = "gc" | "property_manager" | "developer" | "architect" | "franchise";
 export type Market = "houston" | "san_antonio" | "austin" | "dfw" | "texas";
 
 export const SEGMENT_LABELS: Record<Segment, string> = {
@@ -15,6 +15,7 @@ export const SEGMENT_LABELS: Record<Segment, string> = {
   property_manager: "Property manager",
   developer: "Developer",
   architect: "Architect / design firm",
+  franchise: "Franchise operator",
 };
 
 // Approved claims (Rameel 2026-09-25: staff in San Antonio and Austin;
@@ -193,6 +194,45 @@ If you need a sign fabricator to price something or gut check a design, send it 
 ${SIG_PHONE}`,
     },
   ],
+  // FRANCHISE — DRAFT, NOT YET APPROVED (written 2026-10-19 in the v3 voice).
+  // The segment stays off (OUTREACH_FRANCHISE_ENABLED) until Rameel approves or
+  // rewrites this copy. {{company}} is the brand, e.g. "your Jimmy John's locations".
+  franchise: [
+  {
+    subject: "signs for your {{company}} locations",
+    body: `Hey {{first_name}},
+
+Ray here from Houston Sign Crafters. {{local_line}}
+
+Reaching out because you run {{company}} locations here in Texas, and every one of them needs signs that work.
+
+We handle the drawings, permits, fabrication, and install ourselves. Channel letters, monument and pylon signs, awnings, interior signs, and repairs on the signs you already have. We're licensed to wire and install electric signs in Texas, and we help with landlord approvals.
+
+If you've got a new location coming up or a sign that's acting up, send it over. Otherwise, keep this email for the next opening.
+
+${SIG_FULL}`,
+  },
+  {
+    subject: "",
+    body: `{{first_name}},
+
+One other thing. If your brand keeps an approved vendor list for signs, we're happy to go through their process to get on it.
+
+And between openings, we fix dead letters, cracked faces, and faded panels, including signs we didn't build.
+
+${SIG_SHORT}`,
+  },
+  {
+    subject: "",
+    body: `{{first_name}},
+
+Last one from me.
+
+Next time you sign a lease, send me the address. We'll check what the landlord and the city allow before you spend anything on signs.
+
+${SIG_PHONE}`,
+  },
+],
 };
 
 /** Strip corporate suffixes so "Gage Commercial Construction, LLC" reads naturally in a sentence. */

@@ -263,6 +263,9 @@ export interface ProspectQuery {
   employeeRanges: string[];
   page: number;
   perPage?: number;
+  /** Require the employer's HQ in Texas (default). Off for franchisees, whose
+   *  Apollo employer is usually the brand, headquartered anywhere. */
+  orgInTexas?: boolean;
 }
 
 let prospectSearchOverride: ((q: ProspectQuery) => Promise<ProspectHit[]>) | null = null;
@@ -281,9 +284,9 @@ export async function searchTexasProspects(q: ProspectQuery): Promise<ProspectHi
     body: JSON.stringify({
       person_titles: q.titles,
       person_locations: ["Texas, US"],
-      organization_locations: ["Texas, US"],
+      ...(q.orgInTexas === false ? {} : { organization_locations: ["Texas, US"] }),
       q_organization_keyword_tags: q.keywordTags,
-      organization_num_employees_ranges: q.employeeRanges,
+      ...(q.employeeRanges.length ? { organization_num_employees_ranges: q.employeeRanges } : {}),
       page: q.page,
       per_page: q.perPage ?? 25,
     }),

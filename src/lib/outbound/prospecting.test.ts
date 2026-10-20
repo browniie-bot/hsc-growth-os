@@ -9,6 +9,7 @@ import {
   type RevealedPerson,
 } from "@/lib/integrations/email-finder/client";
 import {
+  autoSendPendingSequence,
   buildDailyOutreachBatch,
   draftDueSequenceFollowups,
   handleOutreachInbound,
@@ -117,7 +118,7 @@ describe("daily batch", () => {
     expect(await draftDueSequenceFollowups(db)).toBe(0);
     await db
       .update(outreachEnrollments)
-      .set({ firstSentAt: new Date(Date.now() - 10 * 86400000) })
+      .set({ firstSentAt: new Date(Date.now() - 10 * 86400000), lastSentAt: new Date(Date.now() - 10 * 86400000) })
       .where(eq(outreachEnrollments.id, e.id));
     expect(await draftDueSequenceFollowups(db)).toBe(1);
     expect(await draftDueSequenceFollowups(db)).toBe(0); // no duplicate draft
@@ -137,6 +138,38 @@ describe("daily batch", () => {
     expect(after?.status).toBe("replied");
     const withdrawn = await db.query.approvals.findFirst({ where: eq(approvals.id, fu.id) });
     expect(withdrawn?.status).toBe("superseded");
+  });
+
+  it("an out-of-office keeps the sequence; a 'no longer with us' auto-reply stops only that address", async () => {
+    await buildDailyOutreachBatch(db, { total: 20 });
+    const ooo = await handleOutreachInbound(db, {
+      from: "Edward Baca <edward@gagecc.com>",
+      subject: "Automatic reply: sign bids",
+      text: "I'm out of the office until Monday.",
+    });
+    expect(ooo).toBe(true);
+    let row = await db.query.outreachEnrollments.findFirst({ where: eq(outreachEnrollments.email, "edward@gagecc.com") });
+    expect(row?.status).toBe("active");
+    await handleOutreachInbound(db, {
+      from: "edward@gagecc.com",
+      subject: "Automatic reply: sign bids",
+      text: "Edward is no longer with us and this mailbox is not monitored.",
+    });
+    row = await db.query.outreachEnrollments.findFirst({ where: eq(outreachEnrollments.email, "edward@gagecc.com") });
+    expect(row?.status).toBe("bounced");
+  });
+
+  it("auto-send approves and queues pending drafts only when OUTREACH_AUTO_SEND=true", async () => {
+    await buildDailyOutreachBatch(db, { total: 20 });
+    expect(await autoSendPendingSequence(db)).toBe(0); // flag off: drafts wait for a human
+    process.env.OUTREACH_AUTO_SEND = "true";
+    try {
+      expect(await autoSendPendingSequence(db)).toBe(2);
+      const rows = await db.select().from(approvals).where(eq(approvals.approvalType, "sequence_email"));
+      expect(rows.every((r) => r.status === "approved" && (r.payload as { queuedSend?: unknown }).queuedSend)).toBe(true);
+    } finally {
+      delete process.env.OUTREACH_AUTO_SEND;
+    }
   });
 
   it("a bounce stops the bounced address; our own BCC copies are ignored", async () => {

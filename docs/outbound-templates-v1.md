@@ -257,3 +257,55 @@ Supported by the website or by Rameel in writing: in-house drawings, permits, fa
 and install; cabinets, monuments, pylons, and awnings built in-house; repairs on signs we
 didn't build; tenant panels; LED work; the At Home and Kirkwood Tech Center installs;
 people in San Antonio and Austin; the W-9 and COI offer (Rameel, 2026-10-01).
+
+---
+
+## E. Franchise operators (DRAFT, waiting for Rameel's approval, 2026-10-19)
+
+Who gets it: franchise owners, franchisees, and multi-unit operators based in Texas, found in
+Apollo. One email per person, not per brand, since many franchisees run the same brand.
+`{{company}}` is the brand, so it reads "your Jimmy John's locations." The segment stays off
+(`OUTREACH_FRANCHISE_ENABLED`) until this copy is approved.
+
+### Email 1
+
+**Subject:** signs for your {{company}} locations
+
+> Hey {{first_name}},
+>
+> Ray here from Houston Sign Crafters. {{local_line}}
+>
+> Reaching out because you run {{company}} locations here in Texas, and every one of them
+> needs signs that work.
+>
+> We handle the drawings, permits, fabrication, and install ourselves. Channel letters,
+> monument and pylon signs, awnings, interior signs, and repairs on the signs you already
+> have. We're licensed to wire and install electric signs in Texas, and we help with
+> landlord approvals.
+>
+> If you've got a new location coming up or a sign that's acting up, send it over.
+> Otherwise, keep this email for the next opening.
+
+### Follow-up 1
+
+> {{first_name}},
+>
+> One other thing. If your brand keeps an approved vendor list for signs, we're happy to go
+> through their process to get on it.
+>
+> And between openings, we fix dead letters, cracked faces, and faded panels, including
+> signs we didn't build.
+
+### Follow-up 2
+
+> {{first_name}},
+>
+> Last one from me.
+>
+> Next time you sign a lease, send me the address. We'll check what the landlord and the
+> city allow before you spend anything on signs.
+
+Claims used: in-house drawings, permits, fabrication, install; TDLR electrical sign license
+(Rameel 2026-10-16); "we help with landlord approvals" (2026-09-23); repairs on signs we
+didn't build (`/services/sign-repair`). No pricing, no warranty, no claim that interior or
+ADA signs are built in our shop.
