@@ -111,8 +111,9 @@ UI flow, owner rules in force, live numbers, and the prioritized open items.
   `docs/outbound-templates-v1.md` (v3). Only `{{first_name}}`, `{{company}}`,
   `{{local_line}}` are filled. Never route this copy through an LLM; change it only with his
   written approval.
-- **Every touch waits for approval** (`sequence_email` approvals in the Outbox). He wants to
-  review emails for the first days; don't add auto-send without asking him.
+- **Auto-send is ON since 2026-10-19** (`OUTREACH_AUTO_SEND=true`, Rameel's call after reviewing
+  the first two weeks). New segments still need their template approved first (franchise is
+  built but off until then).
 - **Sources: Apollo only.** Never PlanHub (Jamal works those GCs himself). Texas-wide
   including Dallas. One person per company; only Apollo `verified` emails; sign companies
   skipped. Revealed-but-unusable people are stored as `skipped` so a credit is never spent

@@ -37,6 +37,23 @@ up.
 - **The measure of success** is contractors adding HSC to their bid lists and sending
   invites. Count those, not reply rates alone.
 
+## Auto-send is ON (2026-10-19)
+
+Rameel switched the Texas outreach lane to automatic sending: "we can send the automated
+emails" (10/19). `OUTREACH_AUTO_SEND=true` approves every sequence email as written and queues
+it into the normal 9am–5:30pm send window. The daily cap is 40 (`SEND_DAILY_CAP`), and overflow
+rolls to the next weekday. Replies and bounces still stop sequences. Out-of-office auto-replies
+don't stop anything, and "no longer with us" notices stop that one address. Touches are at
+least 2 business days apart.
+
+- Status on 10/19: 60 people had email 1, and 135 emails were queued after the backlog
+  cleared (the week of 10/12 sat unapproved). Resend reported 71 of 73 delivered and 2 bounced
+  (both stopped). The only inbound so far was a departed-employee notice from lpc.com.
+- **Franchise operators** are built but OFF (`OUTREACH_FRANCHISE_ENABLED`) until Rameel
+  approves the draft template in `docs/outbound-templates-v1.md`, section E. They are Texas
+  franchisees and multi-unit owners (about 11,800 in Apollo), deduped per person.
+- To pause all outreach sending, set `OUTREACH_AUTO_SEND=false`. Drafts then wait in the Outbox.
+
 ## How a lead moves through the portal
 
 1. **Morning intake (~8am Houston, automatic).** TDLR filings from 9 Greater Houston
