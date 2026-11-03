@@ -555,6 +555,17 @@ export async function handleOutreachInbound(
       where: sql`split_part(${outreachEnrollments.email}, '@', 2) = ${domain}`,
     });
   }
+  // Replies from a different address or domain than the one Apollo had
+  // (2026-11-03: WC Construction answered from wcc-build.com, not
+  // wcconstructioncompany.com, and got two more follow-ups). The quoted
+  // original still names our recipient, so look for it in the reply text.
+  if (!matches.length && /^(re|fw|fwd):/i.test(msg.subject.trim())) {
+    const text = msg.text.toLowerCase();
+    const candidates = await db.query.outreachEnrollments.findMany({
+      where: sql`${outreachEnrollments.email} <> '' and ${outreachEnrollments.lastStepSent} > 0`,
+    });
+    matches = candidates.filter((e) => text.includes(e.email.toLowerCase()));
+  }
   if (!matches.length) return false;
 
   for (const e of matches) {

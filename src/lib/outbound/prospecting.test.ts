@@ -140,6 +140,20 @@ describe("daily batch", () => {
     expect(withdrawn?.status).toBe("superseded");
   });
 
+  it("a reply from a different domain still stops the sequence when it quotes our email", async () => {
+    await buildDailyOutreachBatch(db, { total: 20 });
+    const sent = (await db.select().from(outreachEnrollments).where(eq(outreachEnrollments.email, "edward@gagecc.com")))[0];
+    await markSequenceSent(db, sent.id, 1, "sign bids");
+    const handled = await handleOutreachInbound(db, {
+      from: "Jim Woolley <jwoolley@other-domain.com>",
+      subject: "Re: sign bids",
+      text: "Send me your W-9.\n\nFrom: Ray at Houston Sign Crafters\nTo: edward@gagecc.com\nSubject: sign bids",
+    });
+    expect(handled).toBe(true);
+    const row = await db.query.outreachEnrollments.findFirst({ where: eq(outreachEnrollments.email, "edward@gagecc.com") });
+    expect(row?.status).toBe("replied");
+  });
+
   it("an out-of-office keeps the sequence; a 'no longer with us' auto-reply stops only that address", async () => {
     await buildDailyOutreachBatch(db, { total: 20 });
     const ooo = await handleOutreachInbound(db, {
