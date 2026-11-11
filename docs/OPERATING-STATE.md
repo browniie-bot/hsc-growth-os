@@ -18,6 +18,8 @@ The Growth OS is offline and cold outreach is stopped. Nothing was deleted.
 - The Supabase database is untouched, so all accounts, contacts, and replies are still there.
 - The weekly SEO scan (it lived in this app) is off, and the Tuesday publish task
   `hsc-weekly-seo-publish` is paused.
+- **Apollo subscription cancelled by Rameel (2026-11-11).** People discovery and email lookup
+  won't work if this app is ever restarted, until a new data source is set up.
 - **To bring it back:** set the switches you need back to `true`, then redeploy (`railway up`
   from this repo). Don't restart outreach without Rameel asking.
 
