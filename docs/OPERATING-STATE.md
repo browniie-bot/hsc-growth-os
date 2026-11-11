@@ -6,6 +6,21 @@ and what is still open. Engineering rules learned in production are in
 [`AGENTS.md`](../AGENTS.md) under "Field-learned rules"; the product plan is the master PRD
 in `docs/prds/`.
 
+## SHUT DOWN 2026-11-11 (Rameel: "we are wasting time sending these emails... im also not using the growth os")
+
+The Growth OS is offline and cold outreach is stopped. Nothing was deleted.
+- Railway: the deployment was removed (`railway down`), so the app returns 404 and nothing runs.
+  The env switches are also off as a backstop: ALLOW_EXTERNAL_SEND, OUTREACH_AUTO_SEND,
+  OUTREACH_ENABLED, and ENABLE_SCHEDULER are all `false`.
+- 183 queued outreach emails were cancelled (approval status `superseded`). Every active
+  sequence is `stopped`. Final tally: 786 emails sent; 7 companies replied in person, and 6
+  were contractors (SCI Construction and Nash Industries added HSC to their bid lists).
+- The Supabase database is untouched, so all accounts, contacts, and replies are still there.
+- The weekly SEO scan (it lived in this app) is off, and the Tuesday publish task
+  `hsc-weekly-seo-publish` is paused.
+- **To bring it back:** set the switches you need back to `true`, then redeploy (`railway up`
+  from this repo). Don't restart outreach without Rameel asking.
+
 ## What the portal is for
 
 The Growth OS finds **large repeat-buyer accounts in Greater Houston and named people
